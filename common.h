@@ -11,6 +11,8 @@
 #define is_aligned(value, align) __builtin_is_aligned(value, align)
 #define offsetof(type, member)   __builtin_offsetof(type, member)
 
+#define PAGE_SIZE 4096
+
 void printf(const char *fmt, ...);
 void *memset(void *buf, char c, size_t n);
 void *memcpy(void *dst, const void *src, size_t n);
