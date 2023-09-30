@@ -85,7 +85,7 @@ __attribute__((naked)) void user_entry(void) {
       "sret\n"
       :
       : [sepc] "r" (USER_BASE),
-        [sstatus] "r" (SSTATUS_SPIE)
+        [sstatus] "r" (SSTATUS_SPIE | SSTATUS_SUM)
   );
 }
 
@@ -175,139 +175,8 @@ void putchar(char ch) {
   sbi_call(ch, 0, 0, 0, 0, 0, 0, 1);
 }
 
-void handle_syscall(struct trap_frame *f) {
-  switch (f->a3) {
-    case SYS_PUTCHAR:
-      putchar(f->a0);
-      break;
-    default:
-      PANIC("Unexpected syscall a3=%x\n", f->a3);
-  }
-}
-
-void handle_trap(struct trap_frame *f) {
-  uint32_t scause  = READ_CSR(scause);
-  uint32_t stval   = READ_CSR(stval);
-  uint32_t user_pc = READ_CSR(sepc);
-
-  if (scause == SCAUSE_ECALL) {
-    handle_syscall(f);
-    user_pc += 4;
-  } else {
-    PANIC("unexpected trap scause=%x, stval=%x, sepc=%x\n", scause, stval, user_pc);
-  }
-
-  WRITE_CSR(sepc, user_pc);
-}
-
-__attribute__((naked))
-__attribute__((aligned(4)))
-  void kernel_entry(void) {
-    __asm__ __volatile__(
-        "csrrw sp, sscratch, sp\n"
-        "addi sp, sp, -4 * 31\n"
-        "sw ra,  4 * 0(sp)\n"
-        "sw gp,  4 * 1(sp)\n"
-        "sw tp,  4 * 2(sp)\n"
-        "sw t0,  4 * 3(sp)\n"
-        "sw t1,  4 * 4(sp)\n"
-        "sw t2,  4 * 5(sp)\n"
-        "sw t3,  4 * 6(sp)\n"
-        "sw t4,  4 * 7(sp)\n"
-        "sw t5,  4 * 8(sp)\n"
-        "sw t6,  4 * 9(sp)\n"
-        "sw a0,  4 * 10(sp)\n"
-        "sw a1,  4 * 11(sp)\n"
-        "sw a2,  4 * 12(sp)\n"
-        "sw a3,  4 * 13(sp)\n"
-        "sw a4,  4 * 14(sp)\n"
-        "sw a5,  4 * 15(sp)\n"
-        "sw a6,  4 * 16(sp)\n"
-        "sw a7,  4 * 17(sp)\n"
-        "sw s0,  4 * 18(sp)\n"
-        "sw s1,  4 * 19(sp)\n"
-        "sw s2,  4 * 20(sp)\n"
-        "sw s3,  4 * 21(sp)\n"
-        "sw s4,  4 * 22(sp)\n"
-        "sw s5,  4 * 23(sp)\n"
-        "sw s6,  4 * 24(sp)\n"
-        "sw s7,  4 * 25(sp)\n"
-        "sw s8,  4 * 26(sp)\n"
-        "sw s9,  4 * 27(sp)\n"
-        "sw s10, 4 * 28(sp)\n"
-        "sw s11, 4 * 29(sp)\n"
-
-        "csrr a0, sscratch\n"
-        "sw a0, 4 * 30(sp)\n"
-
-        "addi a0, sp, 4 * 31\n"
-        "csrw sscratch, a0\n"
-
-        "mv a0, sp\n"
-        "call handle_trap\n"
-
-        "lw ra,  4 * 0(sp)\n"
-        "lw gp,  4 * 1(sp)\n"
-        "lw tp,  4 * 2(sp)\n"
-        "lw t0,  4 * 3(sp)\n"
-        "lw t1,  4 * 4(sp)\n"
-        "lw t2,  4 * 5(sp)\n"
-        "lw t3,  4 * 6(sp)\n"
-        "lw t4,  4 * 7(sp)\n"
-        "lw t5,  4 * 8(sp)\n"
-        "lw t6,  4 * 9(sp)\n"
-        "lw a0,  4 * 10(sp)\n"
-        "lw a1,  4 * 11(sp)\n"
-        "lw a2,  4 * 12(sp)\n"
-        "lw a3,  4 * 13(sp)\n"
-        "lw a4,  4 * 14(sp)\n"
-        "lw a5,  4 * 15(sp)\n"
-        "lw a6,  4 * 16(sp)\n"
-        "lw a7,  4 * 17(sp)\n"
-        "lw s0,  4 * 18(sp)\n"
-        "lw s1,  4 * 19(sp)\n"
-        "lw s2,  4 * 20(sp)\n"
-        "lw s3,  4 * 21(sp)\n"
-        "lw s4,  4 * 22(sp)\n"
-        "lw s5,  4 * 23(sp)\n"
-        "lw s6,  4 * 24(sp)\n"
-        "lw s7,  4 * 25(sp)\n"
-        "lw s8,  4 * 26(sp)\n"
-        "lw s9,  4 * 27(sp)\n"
-        "lw s10, 4 * 28(sp)\n"
-        "lw s11, 4 * 29(sp)\n"
-        "lw sp,  4 * 30(sp)\n"
-        "sret\n"
-  );
-}
-
-struct process *proc_a;
-struct process *proc_b;
-
-void proc_a_entry(void) {
-  printf("Starting process A\n");
-
-  while (1) {
-    putchar('A');
-
-    yield();
-
-    for (int i = 0; i < 30000000; i++)
-      __asm__ __volatile__("nop");
-  }
-}
-
-void proc_b_entry(void) {
-  printf("Starting process B\n");
-
-  while (1) {
-    putchar('B');
-
-    yield();
-
-    for (int i = 0; i < 30000000; i++)
-      __asm__ __volatile__("nop");
-  }
+long getchar(void) {
+  return sbi_call(0, 0, 0, 0, 0, 0, 0, 2);
 }
 
 uint32_t virtio_reg_read32(unsigned offset) {
@@ -476,6 +345,237 @@ void fs_init(void) {
     printf("file: %s, size=%d\n", file->name, file->size);
 
     off += align_up(sizeof(struct tar_header) + filesz, SECTOR_SIZE);
+  }
+}
+
+void fs_flush(void) {
+  memset(disk, 0, sizeof(disk));
+
+  unsigned off = 0;
+  for (int file_i = 0; file_i < FILES_MAX; file_i++) {
+    struct file *file = &files[file_i];
+    if (!file->in_use)
+      continue;
+
+    struct tar_header *header = (struct tar_header *)&disk[off];
+    memset(header, 0, sizeof(*header));
+    strcpy(header->name,    file->name);
+    strcpy(header->mode,    "000644");
+    strcpy(header->magic,   "ustar");
+    strcpy(header->version, "00");
+    header->type = '0';
+
+    int filesz = file->size;
+    int i = 0;
+    do {
+      header->size[i++] = (filesz % 8) + '0';
+      filesz /= 8;
+    } while (filesz > 0);
+
+    int checksum = ' ' * sizeof(header->checksum);
+    for (unsigned i = 0; i < sizeof(struct tar_header); i++)
+      checksum += (unsigned char)disk[off + i];
+
+    for (int i = 0; i >= 0; i--) {
+      header->checksum[i] = (checksum % 8) + '0';
+      checksum /= 8;
+    }
+
+    memcpy(header->size, file->data, file->size);
+    off += align_up(sizeof(struct tar_header) + file->size, SECTOR_SIZE);
+  }
+
+  for (unsigned sector = 0; sector < sizeof(disk) / SECTOR_SIZE; sector++)
+    read_write_disk(&disk[sector * SECTOR_SIZE], sector, true);
+
+  printf("Wrote %d bytes to disk\n", sizeof(disk));
+}
+
+struct file *fs_lookup(const char *filename) {
+  for (int i = 0; i < FILES_MAX; i++) {
+    struct file *file = &files[i];
+    if (!strcmp(file->name, filename))
+      return file;
+  }
+
+  return NULL;
+}
+
+void handle_syscall(struct trap_frame *f) {
+  switch (f->a3) {
+    case SYS_PUTCHAR:
+      putchar(f->a0);
+      break;
+    case SYS_GETCHAR:
+      while (1) {
+        long ch = getchar();
+        if (ch >= 0) {
+          f->a0 = ch;
+          break;
+        }
+
+        yield();
+      }
+      break;
+    case SYS_EXIT:
+      printf("Process %d exited\n", current_proc->pid);
+      current_proc->state = PROC_EXITED;
+      yield();
+      PANIC("unreachable");
+    case SYS_READFILE:
+    case SYS_WRITEFILE: {
+      const char *filename = (const char *)f->a0;
+      char *buf = (char *)f->a1;
+      int len = f->a2;
+
+      struct file *file = fs_lookup(filename);
+      if (!file) {
+        printf("File not found: %s\n", filename);
+        f->a0 = -1;
+        break;
+      }
+
+      if (len > (int)sizeof(file->data))
+        len = file->size;
+
+      if (f->a3 == SYS_WRITEFILE) {
+        memcpy(file->data, buf, len);
+        file->size = len;
+        fs_flush();
+      } else {
+        memcpy(buf, file->data, len);
+      }
+
+      f->a0 = len;
+      break;
+    }
+    default:
+      PANIC("Unexpected syscall a3=%x\n", f->a3);
+  }
+}
+
+void handle_trap(struct trap_frame *f) {
+  uint32_t scause  = READ_CSR(scause);
+  uint32_t stval   = READ_CSR(stval);
+  uint32_t user_pc = READ_CSR(sepc);
+
+  if (scause == SCAUSE_ECALL) {
+    handle_syscall(f);
+    user_pc += 4;
+  } else {
+    PANIC("unexpected trap scause=%x, stval=%x, sepc=%x\n", scause, stval, user_pc);
+  }
+
+  WRITE_CSR(sepc, user_pc);
+}
+
+__attribute__((naked))
+__attribute__((aligned(4)))
+  void kernel_entry(void) {
+    __asm__ __volatile__(
+        "csrrw sp, sscratch, sp\n"
+        "addi sp, sp, -4 * 31\n"
+        "sw ra,  4 * 0(sp)\n"
+        "sw gp,  4 * 1(sp)\n"
+        "sw tp,  4 * 2(sp)\n"
+        "sw t0,  4 * 3(sp)\n"
+        "sw t1,  4 * 4(sp)\n"
+        "sw t2,  4 * 5(sp)\n"
+        "sw t3,  4 * 6(sp)\n"
+        "sw t4,  4 * 7(sp)\n"
+        "sw t5,  4 * 8(sp)\n"
+        "sw t6,  4 * 9(sp)\n"
+        "sw a0,  4 * 10(sp)\n"
+        "sw a1,  4 * 11(sp)\n"
+        "sw a2,  4 * 12(sp)\n"
+        "sw a3,  4 * 13(sp)\n"
+        "sw a4,  4 * 14(sp)\n"
+        "sw a5,  4 * 15(sp)\n"
+        "sw a6,  4 * 16(sp)\n"
+        "sw a7,  4 * 17(sp)\n"
+        "sw s0,  4 * 18(sp)\n"
+        "sw s1,  4 * 19(sp)\n"
+        "sw s2,  4 * 20(sp)\n"
+        "sw s3,  4 * 21(sp)\n"
+        "sw s4,  4 * 22(sp)\n"
+        "sw s5,  4 * 23(sp)\n"
+        "sw s6,  4 * 24(sp)\n"
+        "sw s7,  4 * 25(sp)\n"
+        "sw s8,  4 * 26(sp)\n"
+        "sw s9,  4 * 27(sp)\n"
+        "sw s10, 4 * 28(sp)\n"
+        "sw s11, 4 * 29(sp)\n"
+
+        "csrr a0, sscratch\n"
+        "sw a0, 4 * 30(sp)\n"
+
+        "addi a0, sp, 4 * 31\n"
+        "csrw sscratch, a0\n"
+
+        "mv a0, sp\n"
+        "call handle_trap\n"
+
+        "lw ra,  4 * 0(sp)\n"
+        "lw gp,  4 * 1(sp)\n"
+        "lw tp,  4 * 2(sp)\n"
+        "lw t0,  4 * 3(sp)\n"
+        "lw t1,  4 * 4(sp)\n"
+        "lw t2,  4 * 5(sp)\n"
+        "lw t3,  4 * 6(sp)\n"
+        "lw t4,  4 * 7(sp)\n"
+        "lw t5,  4 * 8(sp)\n"
+        "lw t6,  4 * 9(sp)\n"
+        "lw a0,  4 * 10(sp)\n"
+        "lw a1,  4 * 11(sp)\n"
+        "lw a2,  4 * 12(sp)\n"
+        "lw a3,  4 * 13(sp)\n"
+        "lw a4,  4 * 14(sp)\n"
+        "lw a5,  4 * 15(sp)\n"
+        "lw a6,  4 * 16(sp)\n"
+        "lw a7,  4 * 17(sp)\n"
+        "lw s0,  4 * 18(sp)\n"
+        "lw s1,  4 * 19(sp)\n"
+        "lw s2,  4 * 20(sp)\n"
+        "lw s3,  4 * 21(sp)\n"
+        "lw s4,  4 * 22(sp)\n"
+        "lw s5,  4 * 23(sp)\n"
+        "lw s6,  4 * 24(sp)\n"
+        "lw s7,  4 * 25(sp)\n"
+        "lw s8,  4 * 26(sp)\n"
+        "lw s9,  4 * 27(sp)\n"
+        "lw s10, 4 * 28(sp)\n"
+        "lw s11, 4 * 29(sp)\n"
+        "lw sp,  4 * 30(sp)\n"
+        "sret\n"
+  );
+}
+
+struct process *proc_a;
+struct process *proc_b;
+
+void proc_a_entry(void) {
+  printf("Starting process A\n");
+
+  while (1) {
+    putchar('A');
+
+    yield();
+
+    for (int i = 0; i < 30000000; i++)
+      __asm__ __volatile__("nop");
+  }
+}
+
+void proc_b_entry(void) {
+  printf("Starting process B\n");
+
+  while (1) {
+    putchar('B');
+
+    yield();
+
+    for (int i = 0; i < 30000000; i++)
+      __asm__ __volatile__("nop");
   }
 }
 
