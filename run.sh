@@ -22,6 +22,12 @@ $CC $CFLAGS -Wl,-Tkernel.ld -Wl,-Map=kernel.map -o kernel.elf \
     common.c \
     shell.bin.o
 
+# Create lorem.txt
+echo "Lorem ipsum dolor sit amet, consectetur adipiscing elit. In ut magna consequat, cursus velit aliquam, scelerisque odio. Ut lorem eros, feugiat quis bibendum vitae, malesuada ac orci. Praesent eget quam non nunc fringilla cursus imperdiet non tellus. Aenean dictum lobortis turpis, non interdum leo rhoncus sed. Cras in tellus auctor, faucibus tortor ut, maximus metus. Praesent placerat ut magna non tristique. Pellentesque at nunc quis dui tempor vulputate. Vestibulum vitae massa orci. Mauris et tellus quis risus sagittis placerat. Integer lorem leo, feugiat sed molestie non, viverra a tellus." > lorem.txt
+
 # Start QEMU
 $QEMU -machine virt -bios default -nographic -serial mon:stdio --no-reboot \
+    -d unimp,guest_errors,int,cpu_reset -D qemu.log \
+    -drive id=drive0,file=lorem.txt,format=raw \
+    -device virtio-blk-device,drive=drive0,bus=virtio-mmio-bus.0 \
     -kernel kernel.elf
