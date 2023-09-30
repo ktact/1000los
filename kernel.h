@@ -25,6 +25,8 @@ struct process {
 
 #define SSTATUS_SPIE (1 << 5)
 
+#define SCAUSE_ECALL 8
+
 struct sbiret {
   long error;
   long value;

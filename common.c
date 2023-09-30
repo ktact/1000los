@@ -21,9 +21,7 @@ struct sbiret sbi_call(long arg0, long arg1, long arg2, long arg3, long arg4, lo
   };
 }
 
-void putchar(char ch) {
-  sbi_call(ch, 0, 0, 0, 0, 0, 0, /* Console Putchar */1);
-}
+void putchar(char ch);
 
 void printf(const char *fmt, ...) {
   va_list vargs;
